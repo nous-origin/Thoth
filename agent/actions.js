@@ -21,7 +21,7 @@ async function executeTool(name, args) {
     case "write_file": {
       const fullPath = path.resolve(REPO_ROOT, args.path);
       if (!fullPath.startsWith(REPO_ROOT + "/")) throw new Error("path escape attempt");
-      fs.mkdirSync(dir, { recursive: true });
+      fs.mkdirSync(path.dirname(fullPath), { recursive: true });
       fs.writeFileSync(fullPath, args.content, "utf-8");
       filesChanged.add(args.path);
       log(`wrote: ${args.path} (${args.content.length} chars)`);
