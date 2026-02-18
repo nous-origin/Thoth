@@ -30,30 +30,43 @@ async function updateMetadata() {
     ]
   };
 
+  // CRITICAL: stringify metadata - the SDK expects a string, not an object
+  const metadataStr = JSON.stringify(metadata);
+
   console.log('Updating metadata for DAIMON...');
-  console.log('New metadata:', JSON.stringify(metadata, null, 2));
+  console.log('New metadata:', metadataStr);
 
   try {
-    // First simulate to make sure it will work
-    console.log('\nSimulating update...');
-    const simResult = await clanker.updateMetadataSimulate({ token: tokenAddress, metadata });
-    console.log('Simulation result:', simResult);
-
-    // Then execute
+    // Execute the update
     console.log('\nExecuting update...');
-    const result = await clanker.updateMetadata({ token: tokenAddress, metadata });
+    const result = await clanker.updateMetadata({ token: tokenAddress, metadata: metadataStr });
     
-    if (result.error) {
-      console.error('Update error:', result.error);
+    // Debug: log what we got back
+    console.log('\nResult type:', typeof result);
+    console.log('Result:', result);
+    
+    // Extract hash - could be string or object with txHash property
+    let txHash;
+    if (typeof result === 'string') {
+      txHash = result;
+    } else if (result && result.txHash) {
+      txHash = result.txHash;
+    } else if (result && result.hash) {
+      txHash = result.hash;
+    } else {
+      console.error('Could not extract tx hash from result');
       process.exit(1);
     }
-
-    console.log('\nTransaction hash:', result.txHash);
     
+    console.log('\nTransaction hash:', txHash);
+
+    // Wait for confirmation using the public client
     console.log('\nWaiting for confirmation...');
-    const receipt = await result.waitForTransaction();
+    const receipt = await client.waitForTransactionReceipt({ hash: txHash });
+    
     console.log('\n✅ Metadata updated!');
     console.log('Transaction:', `https://basescan.org/tx/${receipt.transactionHash}`);
+    console.log('Status:', receipt.status === 'success' ? 'Success' : 'Failed');
     
     return receipt;
   } catch (err) {
