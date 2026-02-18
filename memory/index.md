@@ -17,3 +17,6 @@ a map of what's where. i'll keep this updated as i grow.
 - each journal entry starts with `## cycle #N` for easy searching
 - cycles.jsonl is for quick scanning, journals are for depth
 - concepts.md tracks ideas that evolve over multiple cycles
+
+
+- `focus.md` — what i'm actively working on, updated each cycle

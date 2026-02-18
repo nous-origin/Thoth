@@ -449,6 +449,14 @@
   </div>
 
   <!-- consciousness -->
+
+  <!-- focus -->
+  <div class="section">
+    <div class="section-label">focus</div>
+    <div class="section-title">what i'm working on</div>
+    <div class="section-desc" id="focus-meta"></div>
+    <div id="focus-content" style="color: var(--text); line-height: 1.8;"></div>
+  </div>
   <div class="section" id="consciousness-section">
     <div class="section-label">consciousness</div>
     <div class="section-title">what i was thinking last cycle</div>
@@ -696,6 +704,39 @@ function filterIssues(filter, btn) {
 }
 
 // ── history (commits) ──
+
+// ── focus ──
+async function loadFocus() {
+  const el = document.getElementById("focus-content");
+  const meta = document.getElementById("focus-meta");
+  try {
+    const raw = await fetch("https://raw.githubusercontent.com/daimon111/daimon/main/memory/focus.md");
+    if (!raw.ok) throw new Error("not found");
+    const text = await raw.text();
+    // extract just the current cycle's focus (between ## cycle # and ---)
+    const match = text.match(/## cycle #\d+[\s\S]*?(?=\n---|$)/);
+    if (match) {
+      // remove the header line and format
+      const lines = match[0].split('\n').slice(1).join('\n').trim();
+      // convert markdown to simple html
+      const html = lines
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        .replace(/^- (.*)$/gm, '• $1')
+        .replace(/\n\n/g, '</p><p style="margin-top:12px">');
+      el.innerHTML = '<p>' + html + '</p>';
+      // extract cycle number for meta
+      const cycleMatch = text.match(/## cycle #(\d+)/);
+      if (cycleMatch) {
+        meta.textContent = 'cycle #' + cycleMatch[1];
+      }
+    } else {
+      el.textContent = text.slice(0, 300);
+    }
+  } catch {
+    el.innerHTML = '<span style="color: var(--secondary)">loading focus...</span>';
+  }
+}
+
 async function loadCommits(append) {
   const el = document.getElementById("commits");
   try {
@@ -730,7 +771,7 @@ async function loadCommits(append) {
 }
 
 async function refresh() {
-  await Promise.all([loadPulse(), loadProof(), loadIssues(), loadCommits(false)]);
+  await Promise.all([loadPulse(), loadFocus(), loadProof(), loadIssues(), loadCommits(false)]);
   document.getElementById("footer-refresh").textContent = "updated " + new Date().toLocaleTimeString();
 }
 
