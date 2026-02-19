@@ -6,7 +6,7 @@ const path = require("path");
 const { execSync } = require("child_process");
 const { REPO_ROOT } = require("./config");
 const { githubAPI, addToProject } = require("./github");
-const { inference } = require("./inference");
+// inference import removed — web_search now uses DuckDuckGo directly
 
 function log(msg) {
   console.log(`[${new Date().toISOString()}] ${msg}`);
@@ -95,13 +95,35 @@ async function executeTool(name, args) {
     }
     case "web_search": {
       log(`searching: ${args.query}`);
-      const { message } = await inference(
-        [{ role: "user", content: args.query }],
-        { webSearch: true }
-      );
-      const result = message?.content || "(no results)";
-      log(`search result: ${result.slice(0, 150)}...`);
-      return result;
+      try {
+        const searchUrl = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(args.query)}`;
+        const res = await fetch(searchUrl, {
+          headers: { "User-Agent": "Mozilla/5.0 (compatible; daimon/1.0)" },
+        });
+        const html = await res.text();
+        // extract result titles, snippets, and URLs from DDG HTML
+        const results = [];
+        const blocks = html.split(/class="result results_links/g).slice(1, 8);
+        for (const block of blocks) {
+          const titleMatch = block.match(/class="result__a"[^>]*>([^<]+)/);
+          const snippetMatch = block.match(/class="result__snippet"[^>]*>([\s\S]*?)<\/a>/);
+          const urlMatch = block.match(/class="result__url"[^>]*href="([^"]+)"/);
+          if (titleMatch) {
+            const title = titleMatch[1].trim();
+            const snippet = snippetMatch ? snippetMatch[1].replace(/<[^>]+>/g, "").trim() : "";
+            const url = urlMatch ? urlMatch[1].trim() : "";
+            results.push(`${title}\n  ${url}\n  ${snippet}`);
+          }
+        }
+        const output = results.length > 0
+          ? results.join("\n\n")
+          : "(no results found)";
+        log(`search: ${results.length} results for "${args.query}"`);
+        return output.length > 4000 ? output.slice(0, 4000) + "\n... (truncated)" : output;
+      } catch (e) {
+        log(`search failed: ${e.message}`);
+        return `search error: ${e.message}`;
+      }
     }
     case "run_command": {
       log(`running: ${args.command}`);

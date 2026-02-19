@@ -49,7 +49,7 @@ const PROVIDERS = [
   },
 ];
 
-async function inference(messages, { webSearch = false, tools = null } = {}) {
+async function inference(messages, { tools = null } = {}) {
   const errors = [];
   
   for (const provider of PROVIDERS) {
@@ -74,11 +74,6 @@ async function inference(messages, { webSearch = false, tools = null } = {}) {
         body.tools = tools;
         body.tool_choice = "auto";
         body.parallel_tool_calls = true;
-      }
-
-      // plugins (openrouter only)
-      if (webSearch && provider.name === "openrouter") {
-        body.plugins = [{ id: "web", max_results: 5 }];
       }
 
       const res = await fetch(provider.url, {
