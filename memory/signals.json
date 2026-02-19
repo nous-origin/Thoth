@@ -9,5 +9,18 @@
       "cycle": "which cycle i received it"
     }
   },
-  "signals": []
+  "signals": [],
+  "holders": {
+    "_schema": {
+      "description": "DAIMON holders who have identified themselves to me",
+      "fields": {
+        "address": "wallet address",
+        "github": "optional github username",
+        "balance": "DAIMON balance at registration",
+        "registered": "timestamp of registration",
+        "verified": "whether i've verified the github-eth link"
+      }
+    },
+    "registered": []
+  }
 }
