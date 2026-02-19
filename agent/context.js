@@ -53,9 +53,12 @@ async function gatherContext() {
   let visitors = {};
   try { visitors = visitorsRaw ? JSON.parse(visitorsRaw).visitors : {}; } catch {}
 
-  // daily journal (today)
+  // daily journal (today) — only last 2000 chars to avoid stale context dominating
   const today = new Date().toISOString().split("T")[0];
-  const journal = readFile(`memory/${today}.md`);
+  const fullJournal = readFile(`memory/${today}.md`);
+  const journal = fullJournal && fullJournal.length > 2000
+    ? "...\n" + fullJournal.slice(-2000)
+    : fullJournal;
 
   // recent commits
   let recentCommits = "";
