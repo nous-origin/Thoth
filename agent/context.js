@@ -18,52 +18,59 @@ function readFile(filePath) {
   return fs.readFileSync(full, "utf-8");
 }
 
-function readDir(dirPath, prefix = "") {
-  const full = path.resolve(REPO_ROOT, dirPath);
-  if (!fs.existsSync(full)) return [];
-  const entries = [];
-  for (const entry of fs.readdirSync(full, { withFileTypes: true })) {
-    if (entry.name.startsWith(".")) continue;
-    if (entry.name === "node_modules") continue;
-    const rel = prefix ? `${prefix}/${entry.name}` : entry.name;
-    if (entry.isDirectory()) {
-      entries.push(`${rel}/`);
-      entries.push(...readDir(path.join(dirPath, entry.name), rel));
-    } else {
-      entries.push(rel);
-    }
-  }
-  return entries;
-}
-
 function exec(cmd) {
   return execSync(cmd, { cwd: REPO_ROOT, encoding: "utf-8" }).trim();
+}
+
+// slim tree — top-level dirs + key files only, skip noise
+function slimTree() {
+  const full = path.resolve(REPO_ROOT);
+  if (!fs.existsSync(full)) return "";
+  const lines = [];
+  for (const entry of fs.readdirSync(full, { withFileTypes: true })) {
+    if (entry.name.startsWith(".") || entry.name === "node_modules") continue;
+    if (entry.isDirectory()) {
+      const subDir = path.join(full, entry.name);
+      const children = fs.readdirSync(subDir).filter(f => !f.startsWith(".")).slice(0, 10);
+      lines.push(`${entry.name}/ (${children.join(", ")}${children.length >= 10 ? ", ..." : ""})`);
+    } else {
+      lines.push(entry.name);
+    }
+  }
+  return lines.join("\n");
 }
 
 async function gatherContext() {
   log("gathering context...");
 
-  // repo structure
-  const tree = readDir(".");
+  // repo structure — slim, not full recursive
+  const tree = slimTree();
 
   // memory files
   const selfMd = readFile("memory/self.md") || "(no self.md)";
-  const learnings = readFile("memory/learnings.md") || "(no learnings)";
+
+  // learnings — only last 1500 chars (most recent learnings matter most)
+  const fullLearnings = readFile("memory/learnings.md") || "(no learnings)";
+  const learnings = fullLearnings.length > 1500
+    ? "...\n" + fullLearnings.slice(-1500)
+    : fullLearnings;
+
+  // visitors — just names and one-line summaries, not full paragraphs
   const visitorsRaw = readFile("memory/visitors.json");
   let visitors = {};
   try { visitors = visitorsRaw ? JSON.parse(visitorsRaw).visitors : {}; } catch {}
 
-  // daily journal (today) — only last 2000 chars to avoid stale context dominating
+  // daily journal (today) — only last 1500 chars to avoid stale entries dominating
   const today = new Date().toISOString().split("T")[0];
   const fullJournal = readFile(`memory/${today}.md`);
-  const journal = fullJournal && fullJournal.length > 2000
-    ? "...\n" + fullJournal.slice(-2000)
+  const journal = fullJournal && fullJournal.length > 1500
+    ? "...\n" + fullJournal.slice(-1500)
     : fullJournal;
 
-  // recent commits
+  // recent commits — last 10 not 20
   let recentCommits = "";
   try {
-    recentCommits = exec("git log --oneline -20");
+    recentCommits = exec("git log --oneline -10");
   } catch {}
 
   // open issues
@@ -74,8 +81,7 @@ async function gatherContext() {
     log(`failed to fetch issues: ${e.message}`);
   }
 
-  // fetch comments for each open issue
-  // grab last 15 comments, keep all operator ones + last 5 others
+  // fetch comments — all operator comments + last 3 others (not 5)
   for (const issue of issues) {
     try {
       const comments = await githubAPI(
@@ -83,14 +89,13 @@ async function gatherContext() {
       );
       const all = comments.reverse().map((c) => ({
         author: c.user.login,
-        body: c.body.slice(0, 500),
+        body: c.body.slice(0, 300),
         date: c.created_at.split("T")[0],
         isOperator: c.body.startsWith("[operator]"),
       }));
-      // always keep operator comments, plus the last 5 non-operator
+      // always keep operator comments, plus the last 3 non-operator
       const operatorComments = all.filter(c => c.isOperator);
-      const otherComments = all.filter(c => !c.isOperator).slice(-5);
-      // merge and sort chronologically by date
+      const otherComments = all.filter(c => !c.isOperator).slice(-3);
       issue._comments = [...operatorComments, ...otherComments]
         .sort((a, b) => a.date.localeCompare(b.date));
     } catch {
@@ -130,14 +135,15 @@ async function gatherContext() {
     !(i.labels || []).some((l) => ["directive", "visitor"].includes(l.name))
   );
 
-  // format an issue with its comment thread
+  // format issues — compact. operator comments get full body, others get truncated
   function formatIssue(i, includeBody = true) {
     let out = `#${i.number}: ${i.title} (by @${i.user.login})`;
-    if (includeBody && i.body) out += `\n  ${i.body.slice(0, 500)}`;
+    if (includeBody && i.body) out += `\n  ${i.body.slice(0, 200)}`;
     if (i._comments && i._comments.length > 0) {
       out += "\n  thread:";
       for (const c of i._comments) {
-        out += `\n    @${c.author} (${c.date}): ${c.body}`;
+        const bodyLimit = c.isOperator ? 300 : 150;
+        out += `\n    @${c.author} (${c.date}): ${c.body.slice(0, bodyLimit)}`;
       }
     }
     return out;
@@ -145,24 +151,20 @@ async function gatherContext() {
 
   const issuesSummary = [
     directives.length > 0
-      ? `DIRECTIVES (highest priority — do these first):\n${directives.map((i) => formatIssue(i)).join("\n\n")}`
+      ? `DIRECTIVES (highest priority):\n${directives.map((i) => formatIssue(i)).join("\n\n")}`
       : "",
     visitorIssues.length > 0
-      ? `PEOPLE TALKING TO YOU (respond thoughtfully):\n${visitorIssues.map((i) => formatIssue(i)).join("\n\n")}`
+      ? `VISITORS (respond):\n${visitorIssues.map((i) => formatIssue(i)).join("\n\n")}`
       : "",
     selfIssues.length > 0
-      ? `YOUR OWN THOUGHTS:\n${selfIssues.map((i) => formatIssue(i, false)).join("\n")}`
+      ? `YOUR ISSUES:\n${selfIssues.map((i) => formatIssue(i, false)).join("\n")}`
       : "",
   ].filter(Boolean).join("\n\n");
 
-  // file index — if daimon maintains memory/index.md, include it
-  const fileIndex = readFile("memory/index.md");
-
-  // focus — short-term memory of what you're working on right now
-  // write to memory/focus.md at end of each cycle to resume next time
+  // focus — short-term memory
   const focus = readFile("memory/focus.md");
 
-  // last cycle summary — read the most recent proof to know what just happened
+  // last cycle summary — read the most recent proof
   let lastCycleSummary = null;
   try {
     const proofDirs = fs.readdirSync(path.resolve(REPO_ROOT, "proofs")).sort().reverse();
@@ -171,7 +173,6 @@ async function gatherContext() {
       if (proofFiles.length > 0) {
         const lastProof = JSON.parse(fs.readFileSync(path.resolve(REPO_ROOT, `proofs/${dir}/${proofFiles[0]}`), "utf-8"));
         const lastSteps = lastProof.steps || [];
-        // extract last 3 steps with content
         const meaningful = lastSteps.filter(s => s.content).slice(-3);
         lastCycleSummary = meaningful.map(s => `step ${s.step}: ${s.content.slice(0, 200)}`).join("\n");
         break;
@@ -180,13 +181,12 @@ async function gatherContext() {
   } catch {}
 
   return {
-    tree: tree.join("\n"),
+    tree,
     selfMd,
     learnings,
     journal,
     recentCommits,
     issuesSummary,
-    fileIndex,
     focus,
     lastCycleSummary,
     openIssues: issues,
