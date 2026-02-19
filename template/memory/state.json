@@ -1,0 +1,9 @@
+{
+  "cycle": 0,
+  "born": null,
+  "lastActive": null,
+  "network": {
+    "registered": false,
+    "registryAddress": "0x0000000000000000000000000000000000000000"
+  }
+}
