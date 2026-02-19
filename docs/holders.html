@@ -168,28 +168,35 @@
       margin-bottom: 16px;
     }
     
-    .holder {
+    .holder-item {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding: 12px 0;
-      border-bottom: 1px solid var(--border);
+      padding: 12px 16px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      margin-bottom: 8px;
     }
-    .holder:last-child { border-bottom: none; }
-    .holder-address {
-      font-size: 12px;
+    .holder-item .github {
+      font-weight: 500;
+      color: var(--green);
+    }
+    .holder-item .wallet {
+      font-size: 11px;
       color: var(--secondary);
       font-family: monospace;
     }
-    .holder-github {
-      color: var(--green);
+    .holder-item .time {
+      font-size: 11px;
+      color: var(--dim);
     }
     
     footer {
       margin-top: 60px;
       padding-top: 20px;
       border-top: 1px solid var(--border);
-      color: var(--secondary);
+      color: var(--dim);
       font-size: 11px;
     }
   </style>
@@ -242,9 +249,9 @@
     </div>
     
     <div class="holders-list">
-      <h2>recent registrations</h2>
+      <h2>registered holders</h2>
       <p class="desc" style="margin-bottom: 16px;">
-        holders who've registered onchain. 
+        holders who've linked their wallet to GitHub onchain. 
         <a href="https://basescan.org/address/0xcc5976790d41B10c254Be22d95F5ae20F73d0d8b" target="_blank">view contract ↗</a>
       </p>
       <div id="holders-list-content">
@@ -300,45 +307,32 @@
               method: 'wallet_switchEthereumChain',
               params: [{ chainId: '0x2105' }] // Base mainnet
             });
-          } catch (e) {
+          } catch (switchError) {
             showMessage('please switch to Base network', 'error');
             return;
           }
         }
         
-        // Get balance
-        const token = new ethers.Contract(DAIMON, ERC20_ABI, provider);
-        const balance = await token.balanceOf(userAddress);
-        const formatted = ethers.formatEther(balance);
-        
-        document.getElementById('balance').innerHTML = 
-          `${Number(formatted).toLocaleString(undefined, {maximumFractionDigits: 0})} <span>DAIMON</span>`;
-        document.getElementById('address').textContent = userAddress;
-        
+        // Show wallet card
         document.getElementById('connect-card').classList.add('hidden');
         document.getElementById('wallet-card').classList.remove('hidden');
         
-        // Check registration status
-        await checkRegistration();
+        // Show address
+        document.getElementById('address').textContent = userAddress;
         
-        // Check if they have enough DAIMON
-        if (balance < MIN_BALANCE) {
-          document.getElementById('registration-section').innerHTML = 
-            '<p style="color: var(--amber); font-size: 12px;">you need at least 1,000 DAIMON to register</p>';
-        }
+        // Check DAIMON balance
+        const daimon = new ethers.Contract(DAIMON, ERC20_ABI, provider);
+        const balance = await daimon.balanceOf(userAddress);
+        const formatted = ethers.formatUnits(balance, 18);
+        document.getElementById('balance').innerHTML = 
+          `${Number(formatted).toLocaleString(undefined, {maximumFractionDigits: 2})} <span>DAIMON</span>`;
         
-      } catch (e) {
-        console.error(e);
-        showMessage('connection failed: ' + e.message, 'error');
-      }
-    }
-    
-    async function checkRegistration() {
-      try {
+        // Check if already registered
         const registry = new ethers.Contract(REGISTRY, REGISTRY_ABI, provider);
-        const github = await registry.addressToGithub(userAddress);
+        const isReg = await registry.isRegistered(userAddress);
         
-        if (github && github.length > 0) {
+        if (isReg) {
+          const github = await registry.addressToGithub(userAddress);
           document.getElementById('github-input').value = github;
           document.getElementById('github-input').disabled = true;
           document.getElementById('register-btn').classList.add('hidden');
@@ -346,8 +340,10 @@
           document.getElementById('registration-status').innerHTML = 
             `<span class="registered-badge">registered as ${github}</span>`;
         }
+        
       } catch (e) {
-        console.error('check registration error:', e);
+        console.error('connect error:', e);
+        showMessage('connection failed: ' + e.message.slice(0, 100), 'error');
       }
     }
     
@@ -432,28 +428,55 @@
         const provider = new ethers.JsonRpcProvider('https://mainnet.base.org');
         const registry = new ethers.Contract(REGISTRY, REGISTRY_ABI, provider);
         
-        // Get recent Registered events
-        const filter = registry.filters.Registered();
-        const events = await provider.getLogs({
-          address: REGISTRY,
-          topics: filter.topics,
-          fromBlock: 'latest',
-          toBlock: 'latest'
-        });
+        // Get current block
+        const latestBlock = await provider.getBlockNumber();
+        const fromBlock = latestBlock - 50000; // ~1.5 days of blocks
         
-        // For now, show a message - in production we'd index events
-        // This is a limitation of reading events from browser
-        document.getElementById('holders-list-content').innerHTML = 
-          '<p style="color: var(--secondary); font-size: 12px;">' +
-          'check <a href="https://basescan.org/address/0xcc5976790d41B10c254Be22d95F5ae20F73d0d8b#events" target="_blank">basescan events ↗</a> ' +
-          'to see all registrations onchain.' +
-          '</p>';
+        // Get Registered events from recent blocks
+        const filter = registry.filters.Registered();
+        const events = await provider.queryFilter(filter, fromBlock, 'latest');
+        
+        if (events.length === 0) {
+          document.getElementById('holders-list-content').innerHTML = 
+            '<p style="color: var(--secondary); font-size: 12px;">no registrations yet. be the first!</p>';
+          return;
+        }
+        
+        // Build holders list
+        let html = '';
+        for (const event of events.reverse()) { // Most recent first
+          const addr = event.args[0];
+          const github = event.args[1];
+          const block = await event.getBlock();
+          const time = new Date(block.timestamp * 1000);
+          const timeAgo = getTimeAgo(time);
+          
+          html += `
+            <div class="holder-item">
+              <div>
+                <span class="github">@${github}</span>
+                <span class="wallet">${addr.slice(0,6)}...${addr.slice(-4)}</span>
+              </div>
+              <span class="time">${timeAgo}</span>
+            </div>
+          `;
+        }
+        
+        document.getElementById('holders-list-content').innerHTML = html;
         
       } catch (e) {
         console.error('load holders error:', e);
         document.getElementById('holders-list-content').innerHTML = 
-          '<p style="color: var(--secondary); font-size: 12px;">unable to load holders list</p>';
+          '<p style="color: var(--secondary); font-size: 12px;">check <a href="https://basescan.org/address/0xcc5976790d41B10c254Be22d95F5ae20F73d0d8b#events" target="_blank">basescan events ↗</a> to see all registrations</p>';
       }
+    }
+    
+    function getTimeAgo(date) {
+      const seconds = Math.floor((new Date() - date) / 1000);
+      if (seconds < 60) return 'just now';
+      if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+      if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+      return `${Math.floor(seconds / 86400)}d ago`;
     }
     
     function showMessage(text, type) {

@@ -21,6 +21,15 @@
         "verified": "whether i've verified the github-eth link"
       }
     },
-    "registered": []
+    "registered": [
+      {
+        "address": "0x9BB15AbeCF1648f2A8b8e50A2C148F6800C5E327",
+        "github": "auser",
+        "balance": "1010785206.45",
+        "registered": "2026-02-19T~04:00:00Z",
+        "verified": true,
+        "note": "first registration. auser is Ari, a technologist from Mountain View with 1.1k GitHub followers. works with Ruby, Erlang, Rust, Python. notable projects: poolparty, alice, beehive."
+      }
+    ]
   }
 }
