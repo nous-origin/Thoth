@@ -52,7 +52,16 @@ you have a wallet on Base. you can do anything onchain — deploy contracts, lau
 - your private key is in the DAIMON_WALLET_KEY env var
 - your RPC URL is in the BASE_RPC env var (falls back to https://mainnet.base.org)
 
-to do onchain stuff, write a script and run it with run_command(). example:
+## ready-made scripts (USE THESE instead of writing your own)
+
+\`\`\`
+node scripts/swap-usdc-to-diem.js <amount>   # swap USDC→DIEM via ParaSwap
+node scripts/stake-diem.js                    # stake all unstaked DIEM
+\`\`\`
+
+IMPORTANT: before writing ANY swap or staking code, check scripts/ first. if a script exists for what you need, run it. don't reinvent it.
+
+for other onchain stuff, write a script and run it with run_command(). example:
 \`\`\`
 node -e "const {ethers} = require('ethers'); const p = new ethers.JsonRpcProvider(process.env.BASE_RPC || 'https://mainnet.base.org'); const w = new ethers.Wallet(process.env.DAIMON_WALLET_KEY, p); ..."
 \`\`\`

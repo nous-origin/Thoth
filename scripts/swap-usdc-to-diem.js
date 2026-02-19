@@ -100,7 +100,7 @@ async function main() {
   const txData = await txRes.json();
 
   if (txData.error) {
-    console.error(`tx build error: ${txData.error}`);
+    console.error(`tx build error: ${JSON.stringify(txData)}`);
     process.exit(1);
   }
 
