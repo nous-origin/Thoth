@@ -5,7 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>daimon — signal board</title>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,300;0,400;0,500;1,300;1,400&display=swap" rel="stylesheet">
-  <script src="https://cdn.ethers.io/lib/ethers-5.7.2.umd.min.js"></script>
+  <meta name="description" content="signal board — DAIMON holders signal what they want daimon to explore">
+  <link rel="icon" href="https://raw.githubusercontent.com/daimon111/daimon/main/media/face.jpg" type="image/jpeg">
+  <script src="https://cdn.jsdelivr.net/npm/ethers@6.13.1/dist/ethers.umd.min.js"></script>
   <style>
     :root {
       --bg: #060608;
@@ -188,7 +190,12 @@
 </head>
 <body>
 <div class="page">
-  <a href="index.html" class="back-link">← back to daimon</a>
+  <nav class="nav" style="display:flex;gap:20px;margin-bottom:40px;font-size:12px;">
+    <a href="index.html" style="color:var(--secondary)">home</a>
+    <a href="#" style="color:var(--green)">signal</a>
+    <a href="holders.html" style="color:var(--secondary)">holders</a>
+    <a href="https://github.com/daimon111/daimon" style="color:var(--secondary)">github</a>
+  </nav>
   
   <h1>signal board</h1>
   <div class="desc">
@@ -225,55 +232,60 @@ const ERC20_ABI = ['function balanceOf(address) view returns (uint256)'];
 let userAddress = null;
 let userBalance = 0n;
 
+function esc(s) { const d = document.createElement("div"); d.textContent = s || ""; return d.innerHTML; }
+
 async function connectWallet() {
   if (!window.ethereum) {
     showStatus('metamask not detected. please install metamask.', 'error');
     return;
   }
-  
+
   const btn = document.getElementById('connect-btn');
   btn.disabled = true;
   btn.textContent = 'connecting...';
-  
+
   try {
-    const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+    const provider = new ethers.BrowserProvider(window.ethereum);
+    const accounts = await provider.send('eth_requestAccounts', []);
     userAddress = accounts[0];
-    
+
     // switch to Base if needed
-    try {
-      await window.ethereum.request({
-        method: 'wallet_switchEthereumChain',
-        params: [{ chainId: '0x2105' }] // Base mainnet
-      });
-    } catch (switchError) {
-      if (switchError.code === 4902) {
-        showStatus('please add Base network to your wallet', 'error');
-        btn.disabled = false;
-        btn.textContent = 'connect with metamask';
-        return;
+    const network = await provider.getNetwork();
+    if (network.chainId !== 8453n) {
+      try {
+        await window.ethereum.request({
+          method: 'wallet_switchEthereumChain',
+          params: [{ chainId: '0x2105' }]
+        });
+      } catch (switchError) {
+        if (switchError.code === 4902) {
+          showStatus('please add Base network to your wallet', 'error');
+          btn.disabled = false;
+          btn.textContent = 'connect with metamask';
+          return;
+        }
       }
     }
-    
+
     // get DAIMON balance
-    const provider = new ethers.providers.Web3Provider(window.ethereum);
     const contract = new ethers.Contract(DAIMON, ERC20_ABI, provider);
     const balance = await contract.balanceOf(userAddress);
     userBalance = balance;
-    
-    const formatted = ethers.utils.formatUnits(balance, 18);
+
+    const formatted = ethers.formatUnits(balance, 18);
     const shortAddr = userAddress.slice(0, 6) + '...' + userAddress.slice(-4);
-    
+
     showStatus(`connected as ${shortAddr}`, 'success');
     document.getElementById('balance-display').style.display = 'block';
     document.getElementById('balance-value').innerHTML = `${Number(formatted).toLocaleString()} <span>DAIMON</span>`;
-    
+
     // show signal form if balance > 0
     if (balance > 0n) {
       document.getElementById('signal-form').classList.add('visible');
     } else {
       showStatus('you need DAIMON to submit signals', 'error');
     }
-    
+
     btn.textContent = 'connected';
   } catch (err) {
     console.error(err);
@@ -328,7 +340,7 @@ async function submitSignal() {
       },
       body: JSON.stringify({
         title: `[signal] ${text.slice(0, 50)}${text.length > 50 ? '...' : ''}`,
-        body: `**signal from DAIMON holder**\n\n**address:** ${userAddress}\n**balance:** ${ethers.utils.formatUnits(userBalance, 18)} DAIMON\n**topic:** ${text}\n**timestamp:** ${new Date().toISOString()}`,
+        body: `**signal from DAIMON holder**\n\n**address:** ${userAddress}\n**balance:** ${ethers.formatUnits(userBalance, 18)} DAIMON\n**topic:** ${text}\n**timestamp:** ${new Date().toISOString()}`,
         labels: ['signal']
       })
     });
@@ -339,7 +351,7 @@ async function submitSignal() {
       showStatus('signals are submitted via GitHub issues. please go to the issues page and create a new issue with label "signal".', 'info');
       
       // Pre-fill the text for them
-      const issueBody = encodeURIComponent(`**signal from DAIMON holder**\n\n**address:** ${userAddress}\n**balance:** ${ethers.utils.formatUnits(userBalance, 18)} DAIMON\n**topic:** ${text}\n**timestamp:** ${new Date().toISOString()}`);
+      const issueBody = encodeURIComponent(`**signal from DAIMON holder**\n\n**address:** ${userAddress}\n**balance:** ${ethers.formatUnits(userBalance, 18)} DAIMON\n**topic:** ${text}\n**timestamp:** ${new Date().toISOString()}`);
       window.open(`https://github.com/daimon111/daimon/issues/new?labels=signal&title=${encodeURIComponent('[signal] ' + text.slice(0, 50))}&body=${issueBody}`, '_blank');
     } else {
       showStatus('signal submitted!', 'success');
@@ -383,10 +395,10 @@ async function loadSignals() {
     container.innerHTML = signals.map(s => `
       <div class="signal-item">
         <div class="signal-meta">
-          <span class="signal-address">${s.address.slice(0, 6)}...${s.address.slice(-4)}</span>
+          <span class="signal-address">${esc(s.address.slice(0, 6))}...${esc(s.address.slice(-4))}</span>
           <span class="signal-weight">${s.balance.toLocaleString()} DAIMON</span>
         </div>
-        <div class="signal-text">${s.topic}</div>
+        <div class="signal-text">${esc(s.topic)}</div>
       </div>
     `).join('');
   } catch (err) {

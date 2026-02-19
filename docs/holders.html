@@ -4,6 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>daimon — holders</title>
+  <meta name="description" content="register as a DAIMON holder — link your wallet to GitHub for governance">
+  <link rel="icon" href="https://raw.githubusercontent.com/daimon111/daimon/main/media/face.jpg" type="image/jpeg">
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,300;0,400;0,500;1,300;1,400&display=swap" rel="stylesheet">
   <style>
     :root {
@@ -423,50 +425,50 @@
       }
     }
     
+    function esc(s) { const d = document.createElement("div"); d.textContent = s || ""; return d.innerHTML; }
+
     async function loadHolders() {
       try {
         const provider = new ethers.JsonRpcProvider('https://mainnet.base.org');
         const registry = new ethers.Contract(REGISTRY, REGISTRY_ABI, provider);
-        
-        // Get current block
-        const latestBlock = await provider.getBlockNumber();
-        const fromBlock = latestBlock - 50000; // ~1.5 days of blocks
-        
-        // Get Registered events from recent blocks
+
+        // Scan from contract deployment block (covers all registrations)
+        const DEPLOY_BLOCK = 42300000;
+
+        // Get Registered events from deployment to now
         const filter = registry.filters.Registered();
-        const events = await provider.queryFilter(filter, fromBlock, 'latest');
-        
+        const events = await registry.queryFilter(filter, DEPLOY_BLOCK, 'latest');
+
         if (events.length === 0) {
-          document.getElementById('holders-list-content').innerHTML = 
+          document.getElementById('holders-list-content').innerHTML =
             '<p style="color: var(--secondary); font-size: 12px;">no registrations yet. be the first!</p>';
           return;
         }
-        
-        // Build holders list
+
+        // Build holders list without N+1 getBlock calls
         let html = '';
-        for (const event of events.reverse()) { // Most recent first
+        for (const event of events.reverse()) {
           const addr = event.args[0];
           const github = event.args[1];
-          const block = await event.getBlock();
-          const time = new Date(block.timestamp * 1000);
-          const timeAgo = getTimeAgo(time);
-          
+          // Use block number instead of fetching each block's timestamp
+          const blockNum = event.blockNumber;
+
           html += `
             <div class="holder-item">
               <div>
-                <span class="github">@${github}</span>
-                <span class="wallet">${addr.slice(0,6)}...${addr.slice(-4)}</span>
+                <span class="github">@${esc(github)}</span>
+                <span class="wallet">${esc(addr.slice(0,6))}...${esc(addr.slice(-4))}</span>
               </div>
-              <span class="time">${timeAgo}</span>
+              <span class="time">block ${blockNum}</span>
             </div>
           `;
         }
-        
+
         document.getElementById('holders-list-content').innerHTML = html;
-        
+
       } catch (e) {
         console.error('load holders error:', e);
-        document.getElementById('holders-list-content').innerHTML = 
+        document.getElementById('holders-list-content').innerHTML =
           '<p style="color: var(--secondary); font-size: 12px;">check <a href="https://basescan.org/address/0xcc5976790d41B10c254Be22d95F5ae20F73d0d8b#events" target="_blank">basescan events ↗</a> to see all registrations</p>';
       }
     }
