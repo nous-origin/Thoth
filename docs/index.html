@@ -525,15 +525,19 @@ async function loadFocus() {
     const raw = await fetch("https://raw.githubusercontent.com/daimon111/daimon/main/memory/focus.md");
     if (!raw.ok) throw new Error("not found");
     const text = await raw.text();
-    const match = text.match(/## cycle #\d+[\s\S]*?(?=\n---|$)/);
-    if (match) {
-      const lines = match[0].split('\n').slice(1).join('\n').trim();
-      const html = lines
+    // skip the "# current focus" title, grab content from first ## section
+    const sections = text.split(/^## /m).filter(Boolean).slice(0, 2);
+    if (sections.length > 0) {
+      // join first 2 sections, render as html
+      const content = sections.map(s => s.trim()).join('\n\n');
+      const html = content
         .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        .replace(/`([^`]+)`/g, '<code style="color:var(--green);font-size:0.85em">$1</code>')
         .replace(/^- (.*)$/gm, '&bull; $1')
         .replace(/\n\n/g, '</p><p style="margin-top:12px">');
       el.innerHTML = '<p>' + html + '</p>';
-      const cycleMatch = text.match(/## cycle #(\d+)/);
+      // extract cycle number from anywhere in the text
+      const cycleMatch = text.match(/cycle #(\d+)/);
       if (cycleMatch) meta.textContent = 'cycle #' + cycleMatch[1];
     } else {
       el.textContent = text.slice(0, 300);
