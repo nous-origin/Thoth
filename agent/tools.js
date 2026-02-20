@@ -250,6 +250,23 @@ const TOOLS = [
   {
     type: "function",
     function: {
+      name: "search_memory",
+      description: "Search your memory files (memory/*.md, memory/*.json) for a keyword or pattern. Returns matching lines with context. Use this instead of reading entire memory files — much cheaper and faster. Good for: finding past learnings, checking what you know about a topic, looking up visitor info.",
+      parameters: {
+        type: "object",
+        properties: {
+          query: {
+            type: "string",
+            description: "Text or regex pattern to search for in memory files",
+          },
+        },
+        required: ["query"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "github_search",
       description: "Search GitHub for code, repositories, or issues across all of GitHub. Use to find examples, libraries, or how others solved problems.",
       parameters: {

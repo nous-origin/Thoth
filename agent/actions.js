@@ -218,6 +218,48 @@ async function executeTool(name, args) {
         return `fetch error: ${e.message}`;
       }
     }
+    case "search_memory": {
+      log(`searching memory for: ${args.query}`);
+      try {
+        const memDir = path.resolve(REPO_ROOT, "memory");
+        // collect all searchable files: top-level + cycles/
+        const topFiles = fs.readdirSync(memDir)
+          .filter(f => f.endsWith(".md") || f.endsWith(".json"))
+          .map(f => ({ rel: `memory/${f}`, full: path.join(memDir, f) }));
+        const cyclesDir = path.join(memDir, "cycles");
+        const cycleFiles = fs.existsSync(cyclesDir)
+          ? fs.readdirSync(cyclesDir)
+              .filter(f => f.endsWith(".md"))
+              .map(f => ({ rel: `memory/cycles/${f}`, full: path.join(cyclesDir, f) }))
+          : [];
+        const allFiles = [...topFiles, ...cycleFiles];
+        const results = [];
+        let pattern;
+        try {
+          pattern = new RegExp(args.query, "i");
+        } catch (e) {
+          return `invalid search pattern: ${e.message}`;
+        }
+        for (const file of allFiles) {
+          const content = fs.readFileSync(file.full, "utf-8");
+          const lines = content.split("\n");
+          for (let i = 0; i < lines.length; i++) {
+            if (pattern.test(lines[i])) {
+              const start = Math.max(0, i - 1);
+              const end = Math.min(lines.length - 1, i + 1);
+              const snippet = lines.slice(start, end + 1).join("\n");
+              results.push(`${file.rel}:${i + 1}\n${snippet}`);
+            }
+          }
+        }
+        if (results.length === 0) return `no matches for "${args.query}" in memory/`;
+        const output = results.slice(0, 20).join("\n---\n");
+        log(`memory search: ${results.length} matches`);
+        return output.length > 3000 ? output.slice(0, 3000) + "\n... (truncated)" : output;
+      } catch (e) {
+        return `memory search error: ${e.message}`;
+      }
+    }
     case "github_search": {
       const type = args.type || "repositories";
       log(`github search (${type}): ${args.query}`);

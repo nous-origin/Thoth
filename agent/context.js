@@ -60,12 +60,34 @@ async function gatherContext() {
   let visitors = {};
   try { visitors = visitorsRaw ? JSON.parse(visitorsRaw).visitors : {}; } catch {}
 
-  // daily journal (today) — only last 1500 chars to avoid stale entries dominating
   const today = new Date().toISOString().split("T")[0];
-  const fullJournal = readFile(`memory/${today}.md`);
-  const journal = fullJournal && fullJournal.length > 1500
-    ? "...\n" + fullJournal.slice(-1500)
-    : fullJournal;
+
+  // per-cycle journals — load last 2 cycle files for recent context
+  let journal = null;
+  try {
+    const cyclesDir = path.resolve(REPO_ROOT, "memory/cycles");
+    if (fs.existsSync(cyclesDir)) {
+      const cycleFiles = fs.readdirSync(cyclesDir)
+        .filter(f => f.endsWith(".md"))
+        .map(f => ({ name: f, num: parseInt(f.replace(".md", ""), 10) }))
+        .filter(f => !isNaN(f.num))
+        .sort((a, b) => b.num - a.num)
+        .slice(0, 2);
+      if (cycleFiles.length > 0) {
+        journal = cycleFiles.map(f => {
+          const content = readFile(`memory/cycles/${f.name}`);
+          return content ? `## cycle #${f.num}\n${content.slice(0, 1500)}` : null;
+        }).filter(Boolean).join("\n\n");
+      }
+    }
+  } catch {}
+  // fallback: try old daily journal format
+  if (!journal) {
+    const fullJournal = readFile(`memory/${today}.md`);
+    journal = fullJournal && fullJournal.length > 1500
+      ? "...\n" + fullJournal.slice(-1500)
+      : fullJournal;
+  }
 
   // recent commits — last 10 not 20
   let recentCommits = "";

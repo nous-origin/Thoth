@@ -81,6 +81,9 @@ async function main() {
     log(`heartbeat failed: ${e.message}`);
   }
 
+  // ensure memory/cycles/ directory exists for per-cycle journals
+  fs.mkdirSync(path.resolve(REPO_ROOT, "memory/cycles"), { recursive: true });
+
   // gather initial context
   const ctx = await gatherContext();
   ctx.cycle = state.cycle;
