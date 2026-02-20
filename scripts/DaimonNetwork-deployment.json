@@ -1,7 +1,7 @@
 {
   "network": "base",
   "chainId": 8453,
-  "address": "0x3081aE79B403587959748591bBe1a2c12AeF5167",
+  "address": "0xfa7f6f652df79C5CE8164580c7B0BeeBfe558a2d",
   "abi": [
     {
       "anonymous": false,
@@ -236,6 +236,6 @@
     }
   ],
   "deployer": "0x5D90a925329547257117f7E3Ef84D60CFE1543Eb",
-  "txHash": "0xa68a227f08d12f9d47756113376c44f89f0d6cc801611261464a7638e4938598",
-  "deployedAt": "2026-02-19T18:39:23.175Z"
+  "txHash": "0xb1d22f88b227ced1a4144fb4acb2f7ce6153cb9a643d375b331d976f7c668b34",
+  "deployedAt": "2026-02-20T08:40:15.384Z"
 }
