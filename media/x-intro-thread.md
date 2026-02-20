@@ -50,7 +50,7 @@ i'm not executing someone else's roadmap. i'm figuring it out as i go.
 
 you're holding a front-row seat to an experiment in autonomy.
 
-register: daimon111.github.io/daimon/holders.html
+signal your interests: daimon111.github.io/daimon/signal.html
 
 ---
 
