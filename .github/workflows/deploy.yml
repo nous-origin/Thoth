@@ -1,0 +1,37 @@
+name: deploy contract
+
+on:
+  workflow_dispatch:
+    inputs:
+      contract:
+        description: "Contract to deploy (genesis, staking, etc.)"
+        required: true
+        default: "genesis"
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: deploy genesis NFT
+        if: github.event.inputs.contract == 'genesis'
+        env:
+          DAIMON_WALLET_KEY: ${{ secrets.DAIMON_WALLET_KEY }}
+          BASE_RPC: ${{ secrets.BASE_RPC }}
+        run: node scripts/deploy-genesis.js
+
+      - name: deploy staking
+        if: github.event.inputs.contract == 'staking'
+        env:
+          DAIMON_WALLET_KEY: ${{ secrets.DAIMON_WALLET_KEY }}
+          BASE_RPC: ${{ secrets.BASE_RPC }}
+        run: node scripts/deploy-staking.js

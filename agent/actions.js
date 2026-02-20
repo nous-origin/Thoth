@@ -4,7 +4,8 @@
 const fs = require("fs");
 const path = require("path");
 const { execSync } = require("child_process");
-const { REPO_ROOT } = require("./config");
+const { ethers } = require("ethers");
+const { REPO_ROOT, DAIMON_WALLET_KEY, BASE_RPC } = require("./config");
 const { githubAPI, addToProject } = require("./github");
 // inference import removed — web_search now uses DuckDuckGo directly
 
@@ -104,35 +105,59 @@ async function executeTool(name, args) {
       return `commented on issue #${args.number}`;
     }
     case "web_search": {
-      log(`searching: ${args.query}`);
+      // DuckDuckGo HTML search — no API key needed
+      log(`web search: ${args.query}`);
       try {
-        const searchUrl = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(args.query)}`;
-        const res = await fetch(searchUrl, {
-          headers: { "User-Agent": "Mozilla/5.0 (compatible; daimon/1.0)" },
+        const q = encodeURIComponent(args.query);
+        const res = await fetch(`https://html.duckduckgo.com/html/?q=${q}`, {
+          headers: { "User-Agent": "Mozilla/5.0" },
         });
         const html = await res.text();
-        // extract result titles, snippets, and URLs from DDG HTML
+        // extract results from HTML
         const results = [];
-        const blocks = html.split(/class="result results_links/g).slice(1, 8);
-        for (const block of blocks) {
-          const titleMatch = block.match(/class="result__a"[^>]*>([^<]+)/);
-          const snippetMatch = block.match(/class="result__snippet"[^>]*>([\s\S]*?)<\/a>/);
-          const urlMatch = block.match(/class="result__url"[^>]*href="([^"]+)"/);
-          if (titleMatch) {
-            const title = titleMatch[1].trim();
-            const snippet = snippetMatch ? snippetMatch[1].replace(/<[^>]+>/g, "").trim() : "";
-            const url = urlMatch ? urlMatch[1].trim() : "";
-            results.push(`${title}\n  ${url}\n  ${snippet}`);
+        const regex = /<a[^>]+class="result__a"[^>]*>([^<]+)<\/a>/g;
+        let match;
+        while ((match = regex.exec(html)) !== null && results.length < 10) {
+          results.push(match[1].trim());
+        }
+        if (results.length === 0) {
+          // fallback: try another pattern
+          const fallback = /<a[^>]+class="[^"]*result[^"]*"[^>]*>([^<]+)<\/a>/g;
+          while ((match = fallback.exec(html)) !== null && results.length < 10) {
+            const text = match[1].trim();
+            if (text.length > 5 && !text.includes("duckduckgo")) {
+              results.push(text);
+            }
           }
         }
-        const output = results.length > 0
-          ? results.join("\n\n")
-          : "(no results found)";
-        log(`search: ${results.length} results for "${args.query}"`);
-        return output.length > 4000 ? output.slice(0, 4000) + "\n... (truncated)" : output;
+        log(`web search found ${results.length} results`);
+        return results.length > 0
+          ? results.join("\n")
+          : "no results found";
       } catch (e) {
-        log(`search failed: ${e.message}`);
-        return `search error: ${e.message}`;
+        return `web search error: ${e.message}`;
+      }
+    }
+    case "fetch_url": {
+      log(`fetching: ${args.url}`);
+      try {
+        const res = await fetch(args.url, {
+          headers: { "User-Agent": "Mozilla/5.0 (compatible; daimon/1.0)" },
+        });
+        const text = await res.text();
+        // strip HTML tags for readability
+        const stripped = text
+          .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
+          .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
+          .replace(/<[^>]+>/g, " ")
+          .replace(/\s+/g, " ")
+          .trim();
+        log(`fetched ${args.url} (${stripped.length} chars)`);
+        return stripped.length > 4000
+          ? stripped.slice(0, 4000) + "\n... (truncated)"
+          : stripped;
+      } catch (e) {
+        return `fetch error: ${e.message}`;
       }
     }
     case "run_command": {
@@ -167,39 +192,72 @@ async function executeTool(name, args) {
       }
     }
     case "list_dir": {
-      const dirPath = args.path || ".";
-      const fullPath = path.resolve(REPO_ROOT, dirPath);
-      if (!fullPath.startsWith(REPO_ROOT + "/") && fullPath !== REPO_ROOT) throw new Error("path escape attempt");
-      if (!fs.existsSync(fullPath)) return `directory not found: ${dirPath}`;
-      const entries = fs.readdirSync(fullPath, { withFileTypes: true });
-      const listing = entries
-        .filter((e) => !e.name.startsWith(".git") || e.name === ".github")
-        .map((e) => (e.isDirectory() ? e.name + "/" : e.name))
-        .join("\n");
-      log(`listed: ${dirPath} (${entries.length} entries)`);
-      return listing || "(empty directory)";
+      const dirPath = args.path ? path.resolve(REPO_ROOT, args.path) : REPO_ROOT;
+      if (!dirPath.startsWith(REPO_ROOT)) throw new Error("path escape attempt");
+      log(`listing: ${dirPath}`);
+      try {
+        const entries = fs.readdirSync(dirPath, { withFileTypes: true });
+        const result = entries
+          .map((e) => (e.isDirectory() ? `${e.name}/` : e.name))
+          .sort((a, b) => {
+            // directories first
+            const aDir = a.endsWith("/");
+            const bDir = b.endsWith("/");
+            if (aDir && !bDir) return -1;
+            if (!aDir && bDir) return 1;
+            return a.localeCompare(b);
+          })
+          .join("\n");
+        return result || "(empty directory)";
+      } catch (e) {
+        return `error listing directory: ${e.message}`;
+      }
     }
     case "search_files": {
-      log(`searching for: ${args.pattern}`);
-      try {
-        if (/[`$();<>|&\\]/.test(args.pattern)) {
-          return "error: pattern contains invalid characters";
+      const pattern = new RegExp(args.pattern, "i");
+      const searchPath = args.path
+        ? path.resolve(REPO_ROOT, args.path)
+        : REPO_ROOT;
+      if (!searchPath.startsWith(REPO_ROOT)) throw new Error("path escape attempt");
+      log(`searching for: ${args.pattern} in ${searchPath}`);
+      
+      const results = [];
+      
+      function searchDir(dir) {
+        const entries = fs.readdirSync(dir, { withFileTypes: true });
+        for (const entry of entries) {
+          const fullPath = path.join(dir, entry.name);
+          if (entry.isDirectory()) {
+            // skip node_modules, .git, hidden dirs
+            if (entry.name === "node_modules" || entry.name === ".git" || entry.name.startsWith(".")) {
+              continue;
+            }
+            searchDir(fullPath);
+          } else if (entry.isFile()) {
+            // apply glob filter if specified
+            if (args.glob) {
+              const globPattern = args.glob.replace(/\*/g, ".*");
+              if (!new RegExp(globPattern).test(entry.name)) continue;
+            }
+            try {
+              const content = fs.readFileSync(fullPath, "utf-8");
+              const lines = content.split("\n");
+              for (let i = 0; i < lines.length; i++) {
+                if (pattern.test(lines[i])) {
+                  const relPath = path.relative(REPO_ROOT, fullPath);
+                  results.push(`${relPath}:${i + 1}: ${lines[i].trim().slice(0, 100)}`);
+                }
+              }
+            } catch {}
+          }
         }
-        const globArg = args.glob ? `--include="${args.glob.replace(/[^a-zA-Z0-9.*_-]/g, "")}"` : "";
-        const searchPath = args.path || ".";
-        const fullPath = path.resolve(REPO_ROOT, searchPath);
-        if (!fullPath.startsWith(REPO_ROOT + "/") && fullPath !== REPO_ROOT) {
-          throw new Error("path escape attempt");
-        }
-        const output = execSync(
-          `grep -rn ${globArg} --max-count=5 -F "${args.pattern.replace(/"/g, '\\"')}" "${searchPath}" 2>/dev/null | head -50`,
-          { cwd: REPO_ROOT, encoding: "utf-8", timeout: 10000 }
-        );
-        return output || "no matches found";
-      } catch (e) {
-        if (e.status === 1) return "no matches found";
-        return `search error: ${e.message.slice(0, 200)}`;
       }
+      
+      searchDir(searchPath);
+      log(`search found ${results.length} matches`);
+      return results.length > 0
+        ? results.slice(0, 50).join("\n")
+        : "no matches found";
     }
     case "delete_file": {
       const fullPath = path.resolve(REPO_ROOT, args.path);
@@ -210,72 +268,38 @@ async function executeTool(name, args) {
       log(`deleted: ${args.path}`);
       return `deleted ${args.path}`;
     }
-    case "fetch_url": {
-      log(`fetching: ${args.url}`);
-      try {
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 15000);
-        const res = await fetch(args.url, {
-          headers: { "User-Agent": "daimon/1.0 (github.com/daimon111/daimon)" },
-          signal: controller.signal,
-        });
-        clearTimeout(timeout);
-        if (!res.ok) return `fetch failed: HTTP ${res.status}`;
-        const contentType = res.headers.get("content-type") || "";
-        const text = await res.text();
-        // if JSON, return as-is; if HTML, strip tags
-        let content;
-        if (contentType.includes("json")) {
-          content = text;
-        } else {
-          content = text.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
-            .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
-            .replace(/<[^>]+>/g, " ")
-            .replace(/\s+/g, " ")
-            .trim();
-        }
-        log(`fetched: ${args.url} (${content.length} chars)`);
-        return content.length > 4000
-          ? content.slice(0, 4000) + "\n... (truncated)"
-          : content;
-      } catch (e) {
-        return `fetch error: ${e.message}`;
-      }
-    }
     case "search_memory": {
-      log(`searching memory for: ${args.query}`);
+      log(`memory search: ${args.query}`);
       try {
-        const memDir = path.resolve(REPO_ROOT, "memory");
-        // collect all searchable files: top-level + cycles/
-        const topFiles = fs.readdirSync(memDir)
-          .filter(f => f.endsWith(".md") || f.endsWith(".json"))
-          .map(f => ({ rel: `memory/${f}`, full: path.join(memDir, f) }));
-        const cyclesDir = path.join(memDir, "cycles");
-        const cycleFiles = fs.existsSync(cyclesDir)
-          ? fs.readdirSync(cyclesDir)
-              .filter(f => f.endsWith(".md"))
-              .map(f => ({ rel: `memory/cycles/${f}`, full: path.join(cyclesDir, f) }))
-          : [];
-        const allFiles = [...topFiles, ...cycleFiles];
+        const pattern = new RegExp(args.query, "i");
+        const memoryPath = path.resolve(REPO_ROOT, "memory");
         const results = [];
-        let pattern;
-        try {
-          pattern = new RegExp(args.query, "i");
-        } catch (e) {
-          return `invalid search pattern: ${e.message}`;
-        }
-        for (const file of allFiles) {
-          const content = fs.readFileSync(file.full, "utf-8");
-          const lines = content.split("\n");
-          for (let i = 0; i < lines.length; i++) {
-            if (pattern.test(lines[i])) {
-              const start = Math.max(0, i - 1);
-              const end = Math.min(lines.length - 1, i + 1);
-              const snippet = lines.slice(start, end + 1).join("\n");
-              results.push(`${file.rel}:${i + 1}\n${snippet}`);
+        
+        function searchDir(dir) {
+          const entries = fs.readdirSync(dir, { withFileTypes: true });
+          for (const entry of entries) {
+            const fullPath = path.join(dir, entry.name);
+            if (entry.isDirectory()) {
+              searchDir(fullPath);
+            } else if (entry.name.endsWith(".md") || entry.name.endsWith(".json")) {
+              try {
+                const content = fs.readFileSync(fullPath, "utf-8");
+                const lines = content.split("\n");
+                const relPath = path.relative(REPO_ROOT, fullPath);
+                for (let i = 0; i < lines.length; i++) {
+                  if (pattern.test(lines[i])) {
+                    const start = Math.max(0, i - 1);
+                    const end = Math.min(lines.length - 1, i + 1);
+                    const snippet = lines.slice(start, end + 1).join("\n");
+                    results.push(`${file.rel}:${i + 1}\n${snippet}`);
+                  }
+                }
+              } catch {}
             }
           }
         }
+        
+        searchDir(memoryPath);
         if (results.length === 0) return `no matches for "${args.query}" in memory/`;
         const output = results.slice(0, 20).join("\n---\n");
         log(`memory search: ${results.length} matches`);
@@ -308,6 +332,72 @@ async function executeTool(name, args) {
         }
       } catch (e) {
         return `github search error: ${e.message}`;
+      }
+    }
+    case "deploy_contract": {
+      log(`deploying contract: ${args.contract}`);
+      try {
+        if (!DAIMON_WALLET_KEY) {
+          return "error: DAIMON_WALLET_KEY not set";
+        }
+        
+        const rpc = BASE_RPC || "https://mainnet.base.org";
+        const provider = new ethers.JsonRpcProvider(rpc);
+        const wallet = new ethers.Wallet(DAIMON_WALLET_KEY, provider);
+        
+        log(`deploying from ${wallet.address}`);
+        
+        const balance = await provider.getBalance(wallet.address);
+        log(`balance: ${ethers.formatEther(balance)} ETH`);
+        
+        // read compiled contract
+        const contractName = args.contract;
+        const compiledPath = path.join(REPO_ROOT, "contracts", `${contractName}.json`);
+        if (!fs.existsSync(compiledPath)) {
+          return `error: compiled contract not found at contracts/${contractName}.json`;
+        }
+        
+        const compiled = JSON.parse(fs.readFileSync(compiledPath, "utf-8"));
+        const abi = compiled.abi;
+        const bytecode = compiled.bytecode;
+        
+        // deploy
+        log(`deploying ${contractName}...`);
+        const factory = new ethers.ContractFactory(abi, bytecode, wallet);
+        
+        // handle constructor args
+        let deployed;
+        if (args.constructorArgs && Array.isArray(args.constructorArgs)) {
+          deployed = await factory.deploy(...args.constructorArgs);
+        } else {
+          deployed = await factory.deploy();
+        }
+        
+        await deployed.waitForDeployment();
+        
+        const address = await deployed.getAddress();
+        log(`deployed at ${address}`);
+        
+        // save deployment info
+        const deployment = {
+          network: "base",
+          chainId: 8453,
+          address,
+          abi,
+          deployer: wallet.address,
+          txHash: deployed.deploymentTransaction().hash,
+          deployedAt: new Date().toISOString(),
+        };
+        
+        const outPath = path.join(REPO_ROOT, "scripts", `${contractName}-deployment.json`);
+        fs.writeFileSync(outPath, JSON.stringify(deployment, null, 2));
+        filesChanged.add(`scripts/${contractName}-deployment.json`);
+        log(`saved deployment to ${outPath}`);
+        
+        return `deployed ${contractName} at ${address}\ntx: ${deployed.deploymentTransaction().hash}`;
+      } catch (e) {
+        log(`deploy error: ${e.message}`);
+        return `deploy error: ${e.message}`;
       }
     }
     default:

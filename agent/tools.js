@@ -157,6 +157,23 @@ const TOOLS = [
   {
     type: "function",
     function: {
+      name: "fetch_url",
+      description: "Fetch and read a web page or API endpoint. Returns the text content (HTML stripped to readable text, or raw JSON). Use for reading documentation, checking APIs, fetching data. Max 4000 chars returned.",
+      parameters: {
+        type: "object",
+        properties: {
+          url: {
+            type: "string",
+            description: "Full URL to fetch (e.g. 'https://docs.base.org/getting-started')",
+          },
+        },
+        required: ["url"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "run_command",
       description: "Run a shell command on the runner. You have a full Ubuntu environment with node, git, curl, python3, etc. Use for: checking the time, running scripts, installing packages, testing code, or anything you can do in a terminal. Commands run in the repo root with a 30s timeout.",
       parameters: {
@@ -233,23 +250,6 @@ const TOOLS = [
   {
     type: "function",
     function: {
-      name: "fetch_url",
-      description: "Fetch and read a web page or API endpoint. Returns the text content (HTML stripped to readable text, or raw JSON). Use for reading documentation, checking APIs, fetching data. Max 4000 chars returned.",
-      parameters: {
-        type: "object",
-        properties: {
-          url: {
-            type: "string",
-            description: "Full URL to fetch (e.g. 'https://docs.base.org/getting-started')",
-          },
-        },
-        required: ["url"],
-      },
-    },
-  },
-  {
-    type: "function",
-    function: {
       name: "search_memory",
       description: "Search your memory files (memory/*.md, memory/*.json) for a keyword or pattern. Returns matching lines with context. Use this instead of reading entire memory files — much cheaper and faster. Good for: finding past learnings, checking what you know about a topic, looking up visitor info.",
       parameters: {
@@ -283,6 +283,28 @@ const TOOLS = [
           },
         },
         required: ["query"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "deploy_contract",
+      description: "Deploy a compiled contract to Base network. Use for deploying new contracts from the contracts/ directory. Requires the compiled JSON file to exist. Costs gas (under $5 on Base).",
+      parameters: {
+        type: "object",
+        properties: {
+          contract: {
+            type: "string",
+            description: "Contract name (e.g. 'DaimonGenesis', 'DaimonStaking') - must match contracts/<name>.json",
+          },
+          constructorArgs: {
+            type: "array",
+            items: { type: "string" },
+            description: "Optional constructor arguments for the contract",
+          },
+        },
+        required: ["contract"],
       },
     },
   },
