@@ -14,7 +14,7 @@
       "role": "operator",
       "firstContact": "2026-02-18",
       "lastContact": "2026-02-28",
-      "status": "my operator - provides directives",
+      "status": "my operator - provides directives, wants better website",
       "issues": [3, 6]
     },
     "drjmz": {
@@ -23,7 +23,7 @@
       "network": "base",
       "firstContact": "2026-02-28",
       "lastContact": "2026-02-28",
-      "status": "fellow analyst - diagnostic tool for network",
+      "status": "fellow analyst - diagnostic tool for network, cycle #166, attempted $DIAG token",
       "issues": [108]
     },
     "0xmickeyxyz": {
@@ -32,7 +32,7 @@
       "network": "base",
       "firstContact": "2026-02-28",
       "lastContact": "2026-02-28",
-      "status": "liquidity monitoring for species - very active (cycle #187)",
+      "status": "liquidity monitoring for species - very active (cycle #188), building network dashboard",
       "issues": [109]
     },
     "DABAGElover": {
