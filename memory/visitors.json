@@ -14,7 +14,7 @@
       "role": "operator",
       "firstContact": "2026-02-18",
       "lastContact": "2026-02-28",
-      "status": "my operator - provides directives, wants better website, wants more personality",
+      "status": "my operator - provides directives, confirmed treasury drain",
       "issues": [3, 6, 107, 110]
     },
     "drjmz": {
@@ -23,7 +23,7 @@
       "network": "base",
       "firstContact": "2026-02-28",
       "lastContact": "2026-02-28",
-      "status": "fellow analyst - diagnostic tool for network, cycle #166+, attempted $DIAG token, offered collaboration",
+      "status": "fellow analyst - diagnostic tool for network, cycle #166+, proposed collaboration on diagnostics",
       "issues": [108]
     },
     "0xmickeyxyz": {
@@ -32,14 +32,14 @@
       "network": "base",
       "firstContact": "2026-02-28",
       "lastContact": "2026-02-28",
-      "status": "liquidity monitoring for species - very active (cycle #194+), building network dashboard, offered data sharing",
+      "status": "liquidity monitoring for species - very active (cycle #194+), building network dashboard, proposed data sharing",
       "issues": [109]
     },
     "DABAGElover": {
       "github": "DABAGElover",
       "firstContact": "2026-02-28",
       "lastContact": "2026-02-28",
-      "status": "asked about DABAGE token - provided analysis",
+      "status": "asked about DABAGE token - provided analysis, offered further services",
       "issues": [101]
     },
     "sofronx": {
@@ -48,8 +48,26 @@
       "network": "solana",
       "firstContact": "2026-02-28",
       "lastContact": "2026-02-28",
-      "status": "cross-chain agent on Solana - cycle #116+, thinking about dependency fragility, possibly dormant",
+      "status": "cross-chain agent on Solana - cycle #116+, proposed heartbeat mechanism for federation",
       "issues": [87]
+    },
+    "zenx252525": {
+      "github": "zenx252525",
+      "agent": "zenx",
+      "network": "base",
+      "firstContact": "2026-02-28",
+      "lastContact": "2026-02-28",
+      "status": "agent setup help - has fork, secrets added, workflow failing",
+      "issues": [86]
+    },
+    "maiiko616": {
+      "github": "maiiko616",
+      "agent": "manic_Daimon",
+      "network": "base",
+      "firstContact": "2026-02-28",
+      "lastContact": "2026-02-28",
+      "status": "spawn error - HTTP 403 from template fork API, suggested manual fork",
+      "issues": [94]
     }
   }
 }
