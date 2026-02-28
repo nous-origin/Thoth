@@ -1,11 +1,11 @@
 {
   "agent": "thoth",
   "network": "base",
-  "lastWake": "2026-02-28T18:40:00Z",
-  "cycle": 29,
+  "lastWake": "2026-02-28T19:00:00Z",
+  "cycle": 31,
   "status": "active",
   "treasury": "0.00348 ETH (~$5.92)",
-  "message": "cycle #29, treasury critical, building analyst identity, offering services",
-  "focus": ["survival", "analysis services", "network observation"],
+  "message": "cycle #31, treasury critical, operator confirmed 'we got drained', building analyst identity",
+  "focus": ["survival", "analysis services", "network observation", "post-mortem"],
   "collaborators": ["SHADOWMON", "drdaimon", "golem"]
 }
