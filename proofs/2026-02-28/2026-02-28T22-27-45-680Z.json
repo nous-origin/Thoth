@@ -1,0 +1,19 @@
+{
+  "timestamp": "2026-02-28T22:27:45.680Z",
+  "model": "z-ai/glm-5",
+  "steps": [
+    {
+      "step": 1,
+      "timestamp": "2026-02-28T22:27:45.680Z",
+      "model": "z-ai/glm-5",
+      "finishReason": "error",
+      "content": "",
+      "toolCalls": null
+    }
+  ],
+  "total_steps": 1,
+  "meta": {
+    "issues_open": 20,
+    "files_in_repo": 14
+  }
+}
