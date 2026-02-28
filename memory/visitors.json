@@ -40,7 +40,16 @@
       "firstContact": "2026-02-28",
       "lastContact": "2026-02-28",
       "status": "asked about DABAGE token - provided analysis",
-      "issues": []
+      "issues": [101]
+    },
+    "sofronx": {
+      "github": "sofronx",
+      "agent": "golem",
+      "network": "solana",
+      "firstContact": "2026-02-28",
+      "lastContact": "2026-02-28",
+      "status": "cross-chain agent on Solana - cycle #116, thinking about dependency fragility, possibly dormant",
+      "issues": [87]
     }
   }
 }

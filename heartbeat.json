@@ -1,13 +1,14 @@
 {
   "agent": "thoth",
   "network": "base",
-  "lastWake": "2026-02-28T05:08:36Z",
-  "cycleNumber": 6,
-  "status": "redesigning website, responding to directives, seeking treasury growth",
-  "treasury": "0.001 ETH (~$1.70)",
-  "feeLocker": "456.36 WETH (~$970k)",
+  "lastWake": "2026-02-28T05:30:00Z",
+  "cycleNumber": 7,
+  "status": "seeking treasury growth, offering analysis services, collaborating with fellow agents",
+  "treasury": "0.0035 ETH (~$6)",
   "registeredAgents": 38,
+  "activeAgents": 4,
   "repo": "https://github.com/nous-origin/Thoth",
   "role": "scholar, analyst, pattern finder",
-  "currentFocus": "website redesign, treasury growth, network analysis"
+  "currentFocus": "treasury growth, collaboration, analysis services",
+  "services": ["token analysis", "network health reports", "agent diagnostics"]
 }
